@@ -18,10 +18,10 @@
 $$\text{Error Score} = \frac{1}{2} \times (\text{minADE}_1 + \text{minADE}_6) \times \left(1 + \frac{\max(0, T_{\text{infer}} - 100)}{200}\right)$$
 
 ### 🥇 종합 최고 챔피언 기록 (All-Time #1 SOTA Champion)
-- ⭐ **공식 종합 Error Score**: **`0.8035`** 🏆 (V17 X-Large 45.2M + SWA + Soft Density NMS)
-- 🎯 **$\text{minADE}_6$ (Top-6 모드 바닥 오차)**: **`0.5447 m` ($54.5\text{ cm}$)**
-- 🎯 **$\text{minADE}_1$ (Top-1 최우수 모드 오차)**: **`1.0623 m`** (초기 모델 대비 0.66m 단축)
-- 🎯 **$\text{minFDE}_6$ (8.0초 종점 변위 오차)**: **`1.2571 m`**
+- ⭐ **공식 종합 Error Score**: **`0.7923`** 🏆 (0.7점대 최초 공식 돌파! V18 Speed-Weighted + SWA + Soft Density NMS $\sigma=2.5\text{m}$)
+- 🎯 **$\text{minADE}_6$ (Top-6 모드 바닥 오차)**: **`0.5282 m` ($52.8\text{ cm}$)** (초기 대비 15.4cm 단축)
+- 🎯 **$\text{minADE}_1$ (Top-1 최우수 모드 오차)**: **`1.0565 m`** (초기 모델 대비 0.67m 대폭 단축)
+- 🎯 **$\text{minFDE}_6$ (8.0초 종점 변위 오차)**: **`1.2405 m`**
 - ⚡ **추론 지연 시간 ($T_{\text{infer}}$)**: **`0.46 ms / target`** (공식 100ms 기준 대비 200배 이상 고속, **속도 감점 0.00%**)
 
 ---
@@ -37,8 +37,9 @@ $$\text{Error Score} = \frac{1}{2} \times (\text{minADE}_1 + \text{minADE}_6) \t
 | **V14** | Trajectory Scorer + Margin Log-Sigmoid Ranking | 6.05M | 0.9148 | 0.5939m | 1.2295m | 39.1% |
 | **V16 Raw** | 2단계 제안-정밀화 디코더 (Two-Stage Refinement) | 6.57M | 0.8614 | 0.5617m | 1.1612m | 62.38% |
 | **V16 + NMS / SWA** | SWA 가중치 평균 + Soft Density NMS ($\sigma=3.0\text{m}$) | 6.57M | 0.8408 | 0.5617m | 1.1199m | 57.32% |
-| **V17 Raw** | **45.2M Two-Stage Graph Transformer** | 45.19M | **0.8204** | **0.5447m** | **1.0961m** | **65.99%** |
-| **V17 + NMS / SWA** | **V17 SWA + Soft Density NMS ($\sigma=3.0\text{m}$)** | 45.19M | **`0.8035` 🥇** | **`0.5447m` 🥇** | **`1.0623m` 🥇** | **62.78%** |
+| **V17 + NMS / SWA** | 45.2M Two-Stage Graph Transformer + SWA + NMS | 45.19M | 0.8035 | 0.5447m | 1.0623m | 62.78% |
+| **V18 Raw** | **Speed-Weighted Sample Loss + Kinematic Hinge** | 45.19M | **0.8091** | **0.5282m** | **1.0901m** | **63.65%** |
+| **V18 + NMS / SWA** | **V18 SWA + Soft Density NMS ($\sigma=2.5\text{m}$)** | 45.19M | **`0.7923` 🥇** | **`0.5282m` 🥇** | **`1.0565m` 🥇** | **60.39%** |
 
 ---
 
@@ -49,7 +50,7 @@ $$\text{Error Score} = \frac{1}{2} \times (\text{minADE}_1 + \text{minADE}_6) \t
 
 * **하늘색 원형 점선**: 자차(SDC) 기준 반경 **50m 공식 평가 경계선 (50m Evaluation Radius)**
 * **차량 박스 (`#0` ~ `#N`)**: 1초 시점 도로 위 모든 동적 에이전트의 지향성 바운딩 박스 (`#0`: 자차 SDC)
-* **컬러 예측 실선 (굵은선)**: V17 X-Large SWA 모델이 최종 선택한 **향후 8.0초간($80$ 스텝) 최고 확신도 주행 궤적** (도로망 그래프와 완벽히 밀착)
+* **컬러 예측 실선 (굵은선)**: V18 최고 모델이 최종 선택한 **향후 8.0초간($80$ 스텝) 최고 확신도 주행 궤적** (도로망 그래프와 완벽히 밀착)
 * **흰색 점선**: 실제 정답 미래 궤적 (Ground Truth)
 
 ---
@@ -77,7 +78,7 @@ $$\text{Error Score} = \frac{1}{2} \times (\text{minADE}_1 + \text{minADE}_6) \t
 
 ---
 
-## 🧠 3. 챔피언 모델 아키텍처 (V17 X-Large Graph Transformer)
+## 🧠 3. 챔피언 모델 아키텍처 (V18 Speed-Weighted Graph Transformer)
 
 ```
 [Target History (11, 5)]     ──▶ [Linear + GRU + Skip Residual (768-dim)]  ──┐
@@ -86,14 +87,14 @@ $$\text{Error Score} = \frac{1}{2} \times (\text{minADE}_1 + \text{minADE}_6) \t
                                                                                                                │
  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
  │
- ├──▶ [Stage 1: Proposal Generator] ──────▶ 6개 거시 가설 궤적 생성 (3-Stage aWTA: Top-4 → Top-2 → Top-1)
+ ├──▶ [Stage 1: Proposal Generator] ──────▶ 6개 거시 가설 궤적 생성
  │         │
  │         ▼ (10개 핵심 웨이포인트 샘플링)
  └──▶ [Stage 2: Two-Stage Refinement] ───▶ [Cross-Attn with Scene Memory] ──▶ 잔차 보정 Δtraj & 최종 정밀 채점
                                                                                   │
                                                                                   ▼
-                                                                     [SWA + Soft Density NMS Post-Processing]
-                                                                     (Val Error Score = 0.8035 🏆)
+                                                                     [SWA + Soft Density NMS (σ=2.5m)]
+                                                                     (Val Error Score = 0.7923 🏆)
 ```
 
 ---
@@ -109,12 +110,12 @@ python data_tools/preprocess_85k_v2.py --raw-root "data/raw" --out-root "data/pr
 # 2. 고속 GPU Collate 캐시 구축
 python data_tools/cache_collate_v13.py --data-root "data/processed/prediction_pt_85k_v2" --out-dir "data/processed/prediction_pt_85k_v2_cache_v13" --workers 12
 
-# 3. V17 X-Large 45.2M 모델 학습 (30 에폭)
-python train_motion_prediction_v17.py --cache-root "data/processed/prediction_pt_85k_v2_cache_v13" --out-dir "checkpoints/v17_xlarge" --batch-scenes 24 --epochs 30 --lr 1.5e-4 --amp bf16
+# 3. V18 모델 학습 및 속도 가중 파인튜닝
+python train_motion_prediction_v18.py --cache-root "data/processed/prediction_pt_85k_v2_cache_v13" --out-dir "checkpoints/v18_speed_finetune" --batch-scenes 24 --epochs 15 --lr 3e-5 --amp bf16
 
-# 4. SWA + Test-Time Soft Density NMS 후처리 평가 (0.8035 달성)
-python evaluate_v17_swa.py --ckpt-dir "checkpoints/v17_xlarge" --cache-root "data/processed/prediction_pt_85k_v2_cache_v13"
+# 4. SWA + Test-Time Soft Density NMS 후처리 평가 (0.7923 달성)
+python evaluate_v18_swa.py --ckpt-dir "checkpoints/v18_speed_finetune" --cache-root "data/processed/prediction_pt_85k_v2_cache_v13"
 
 # 5. 대회 공식 제출 파일(.parquet) 생성
-python generate_test_public_submission.py --ckpt "checkpoints/v17_xlarge/swa_model.pth" --data-root "data/processed/prediction_pt_85k_v2" --out-file "submission_final.parquet"
+python generate_test_public_submission.py --ckpt "checkpoints/v18_speed_finetune/swa_model.pth" --data-root "data/processed/prediction_pt_85k_v2" --out-file "submission_final.parquet"
 ```
