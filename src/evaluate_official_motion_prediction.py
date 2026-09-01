@@ -20,7 +20,7 @@ import torch
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from train_motion_prediction_v1 import MotionPredictor, SceneWindowDataset, window_to_samples
+from train_motion_prediction_v1 import MotionPredictor, SceneWindowDataset, window_to_samples, expand_neighbor_encoder_state
 
 def evaluate_official_prediction(
     checkpoint_path: str,
@@ -45,7 +45,7 @@ def evaluate_official_prediction(
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     hidden_dim = checkpoint.get('args', {}).get('hidden', 256)
     model = MotionPredictor(hidden=hidden_dim, modes=6).to(device)
-    model.load_state_dict(checkpoint['model_state'])
+    model.load_state_dict(expand_neighbor_encoder_state(checkpoint['model_state']), strict=False)
     model.eval()
 
     total_params = sum(p.numel() for p in model.parameters())

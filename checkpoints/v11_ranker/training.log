@@ -1,0 +1,8 @@
+Ranker 01/8 (262.8s) | pick_acc 0.410 | Val ADE6 3.3526 ADE1_base 3.3526 ADE1_rank 3.3526 acc 0.415 Error 3.3526
+Ranker 02/8 (208.7s) | pick_acc 0.420 | Val ADE6 3.3166 ADE1_base 3.3166 ADE1_rank 3.3166 acc 0.421 Error 3.3166
+Ranker 03/8 (212.2s) | pick_acc 0.423 | Val ADE6 3.2694 ADE1_base 3.2694 ADE1_rank 3.2694 acc 0.423 Error 3.2694
+Ranker 04/8 (213.0s) | pick_acc 0.426 | Val ADE6 3.2698 ADE1_base 3.2698 ADE1_rank 3.2698 acc 0.424 Error 3.2698
+Ranker 05/8 (212.1s) | pick_acc 0.427 | Val ADE6 3.2397 ADE1_base 3.2397 ADE1_rank 3.2397 acc 0.426 Error 3.2397
+Ranker 06/8 (207.6s) | pick_acc 0.428 | Val ADE6 3.2658 ADE1_base 3.2658 ADE1_rank 3.2658 acc 0.426 Error 3.2658
+Ranker 07/8 (207.1s) | pick_acc 0.430 | Val ADE6 3.2701 ADE1_base 3.2701 ADE1_rank 3.2701 acc 0.427 Error 3.2701
+Ranker 08/8 (212.4s) | pick_acc 0.431 | Val ADE6 3.2611 ADE1_base 3.2611 ADE1_rank 3.2611 acc 0.427 Error 3.2611

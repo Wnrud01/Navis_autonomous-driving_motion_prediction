@@ -6,8 +6,12 @@ __pycache__/
 # Large Raw Datasets (preserve preprocessed pipeline configs and scripts)
 data/
 *.pt
+*.pth
 *.tfrecord
 *.parquet
+
+# Ranker / trainer weights (keep training.log metrics.json config.json)
+checkpoints/**/*.pth
 
 # Virtual environments
 .venv/

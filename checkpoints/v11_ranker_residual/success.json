@@ -1,0 +1,19 @@
+{
+  "success": false,
+  "gap": 0.630746603012085,
+  "rules": {
+    "val_minade6_lt": 0.7,
+    "val_pick_acc_gt": 0.7,
+    "gap_lt": 0.15
+  },
+  "epoch": 2,
+  "train_loss": 2.508441991940061,
+  "train_pick_acc": 0.42539468481205955,
+  "epoch_sec": 95.92164134979248,
+  "val_minade6": 0.6258381605148315,
+  "val_minade1_base": 1.2510654926300049,
+  "val_minade1": 1.2565847635269165,
+  "val_error_score": 0.941211462020874,
+  "val_pick_acc": 0.4266844111146843,
+  "n": 292298
+}

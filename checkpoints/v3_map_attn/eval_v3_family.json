@@ -1,0 +1,12 @@
+{
+  "val_loss": 7.676041603088379,
+  "val_minade6": 0.8790217638015747,
+  "val_minade1": 1.6365621089935303,
+  "val_minfde6": 13.45537281036377,
+  "val_minfde1": 15.199202537536621,
+  "val_error_score": 1.2577919363975525,
+  "eval_sec": 84.84275841712952,
+  "arch": "v3",
+  "ckpt": "C:\\Users\\andy0\\Downloads\\motion prediction\\checkpoints\\v3_map_attn\\best_error_score.pth",
+  "max_targets": 24
+}

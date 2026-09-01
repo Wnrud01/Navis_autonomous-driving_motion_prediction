@@ -1,0 +1,12 @@
+{
+  "val_loss": 7.4272871017456055,
+  "val_minade6": 0.8376353979110718,
+  "val_minade1": 1.5806976556777954,
+  "val_minfde6": 13.319963455200195,
+  "val_minfde1": 15.11659049987793,
+  "val_error_score": 1.2091665267944336,
+  "eval_sec": 78.98050165176392,
+  "arch": "v7",
+  "ckpt": "C:\\Users\\andy0\\Downloads\\motion prediction\\checkpoints\\v7_scene_v3\\best_error_score.pth",
+  "max_targets": 24
+}

@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""Train Motion Prediction V6 (V3 + temporal GRU/refiner + late-horizon loss)."""
+from __future__ import annotations
+import argparse, json, os, sys, time
+import torch
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from src.train_motion_prediction_v1 import SceneWindowDataset, list_pt_paths
+from src.train_motion_prediction_v3 import (
+    MAP_K, WindowSampleCollateV3, load_compatible_state,
+)
+from src.train_motion_prediction_v6 import MotionPredictorV6
+from src.losses.awta_loss import AdaptiveWTALoss
+from train_motion_prediction_v2_awta import (
+    configure_runtime, make_loader, move_samples, query_gpu,
+)
+from train_motion_prediction_v3 import evaluate_validation_v3, train_one_epoch_v3, model_forward
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data-root", default=r"E:\motion_planning\data\processed\prediction_pt_85k")
+    parser.add_argument("--out-dir", default=r"E:\motion_prediction\checkpoints\v6_temporal")
+    parser.add_argument("--resume-ckpt", default=r"E:\motion_prediction\checkpoints\v3_map_attn\best_error_score.pth")
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--batch-scenes", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=1.5e-4)
+    parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--prefetch", type=int, default=4)
+    parser.add_argument("--hidden", type=int, default=256)
+    parser.add_argument("--max-targets", type=int, default=24)
+    parser.add_argument("--neighbor-k", type=int, default=16)
+    parser.add_argument("--signal-k", type=int, default=4)
+    parser.add_argument("--map-k", type=int, default=MAP_K)
+    parser.add_argument("--log-every", type=int, default=200)
+    parser.add_argument("--max-packs", type=int, default=0)
+    parser.add_argument("--max-train-steps", type=int, default=0)
+    parser.add_argument("--max-val-steps", type=int, default=0)
+    parser.add_argument("--tau-start", type=float, default=0.5)
+    parser.add_argument("--tau-end", type=float, default=0.25)
+    parser.add_argument("--tau-cls", type=float, default=0.5)
+    parser.add_argument("--top-m-start", type=int, default=2)
+    parser.add_argument("--top-m-end", type=int, default=1)
+    parser.add_argument("--time-weight-end", type=float, default=2.5)
+    parser.add_argument("--weight-fde", type=float, default=0.75)
+    parser.add_argument("--weight-cls", type=float, default=0.8)
+    parser.add_argument("--weight-hard-cls", type=float, default=0.5)
+    parser.add_argument("--amp", choices=["bf16", "fp16", "fp32"], default="bf16")
+    parser.add_argument("--no-fused-adam", action="store_true")
+    args = parser.parse_args()
+
+    configure_runtime(args.workers)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if args.amp == "bf16" and device.type == "cuda" and torch.cuda.is_bf16_supported():
+        amp_dtype = torch.bfloat16
+        use_scaler = False
+    elif args.amp != "fp32" and device.type == "cuda":
+        amp_dtype = torch.float16
+        use_scaler = True
+    else:
+        amp_dtype = torch.float32
+        use_scaler = False
+
+    os.makedirs(args.out_dir, exist_ok=True)
+    log_file = os.path.join(args.out_dir, "training.log")
+    metrics_file = os.path.join(args.out_dir, "metrics.json")
+
+    print("=" * 80)
+    print(" MOTION PREDICTION V6 — TEMPORAL GRU + TRAJ REFINER + LATE-HORIZON LOSS")
+    print(f" Data Root:       {args.data_root}")
+    print(f" Output Dir:      {args.out_dir}")
+    print(f" Resume Checkpoint: {args.resume_ckpt}")
+    print(f" Epochs:          {args.epochs} (Batch: {args.batch_scenes}, LR: {args.lr})")
+    print(f" Neighbors/Map:   {args.neighbor_k} hist / {args.map_k} map pts")
+    print(f" Loss extras:     time_weight_end={args.time_weight_end}, weight_fde={args.weight_fde}, cls={args.weight_cls}, hard_cls={args.weight_hard_cls}", flush=True)
+    print(f" aWTA:            tau {args.tau_start}->{args.tau_end}, Top-{args.top_m_start}->{args.top_m_end}")
+    print(f" Workers/Prefetch: {args.workers}/{args.prefetch}")
+    print(f" AMP:             {args.amp} ({amp_dtype})")
+    print(f" Compute Device:  {device} ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
+    print("=" * 80, flush=True)
+
+    train_paths = list_pt_paths(args.data_root, "train", args.max_packs)
+    val_paths = list_pt_paths(args.data_root, "val", args.max_packs)
+    probe = torch.load(train_paths[0], map_location="cpu", weights_only=False)
+    n_windows = max(1, len(probe.get("windows", [])))
+    print(f"-> Detected {n_windows} window(s) per pack", flush=True)
+
+    train_ds = SceneWindowDataset(args.data_root, "train", paths=train_paths, n_windows=n_windows)
+    val_ds = SceneWindowDataset(args.data_root, "val", paths=val_paths, n_windows=n_windows)
+    pin = device.type == "cuda"
+    train_loader = make_loader(
+        train_ds, args.batch_scenes, args.workers, args.prefetch, True,
+        WindowSampleCollateV3(args.max_targets, args.neighbor_k, args.signal_k, args.map_k, True), pin,
+    )
+    val_loader = make_loader(
+        val_ds, args.batch_scenes, args.workers, args.prefetch, False,
+        WindowSampleCollateV3(args.max_targets, args.neighbor_k, args.signal_k, args.map_k, False), pin,
+    )
+    print(
+        f"-> Train Scenes: {len(train_ds.paths)} | Val Scenes: {len(val_ds.paths)} | "
+        f"Train windows: {len(train_ds)} | Val windows: {len(val_ds)}",
+        flush=True,
+    )
+
+    model = MotionPredictorV6(hidden=args.hidden, modes=6).to(device)
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"-> Model params: {n_params/1e6:.3f}M", flush=True)
+    criterion = AdaptiveWTALoss(
+        modes=6,
+        tau_start=args.tau_start,
+        tau_end=args.tau_end,
+        tau_cls=args.tau_cls,
+        top_m_start=args.top_m_start,
+        top_m_end=args.top_m_end,
+        time_weight_end=args.time_weight_end,
+        weight_fde=args.weight_fde,
+        weight_cls=args.weight_cls,
+        weight_hard_cls=args.weight_hard_cls,
+    ).to(device)
+
+    start_epoch = 1
+    best_error_score = float("inf")
+    best_minade6 = float("inf")
+
+    if args.resume_ckpt and os.path.exists(args.resume_ckpt):
+        print(f"-> Loading compatible weights from: {args.resume_ckpt}", flush=True)
+        ckpt = torch.load(args.resume_ckpt, map_location=device, weights_only=False)
+        missing, unexpected = load_compatible_state(model, ckpt["model_state"])
+        loaded = sum(1 for k in model.state_dict() if k not in missing)
+        print(f"-> Loaded {loaded}/{len(model.state_dict())} tensors (new layers stay random/zero)", flush=True)
+        if missing:
+            print(f"-> New/unmatched keys: {missing}", flush=True)
+
+    fused = (device.type == "cuda") and (not args.no_fused_adam)
+    try:
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=args.lr, weight_decay=args.weight_decay, fused=fused
+        )
+    except TypeError:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        fused = False
+    print(f"-> Optimizer: AdamW fused={fused}", flush=True)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
+
+    with open(os.path.join(args.out_dir, "config.json"), "w", encoding="utf-8") as f:
+        json.dump(
+            {**vars(args), "device": str(device), "amp_dtype": str(amp_dtype), "n_windows": n_windows,
+             "train_packs": len(train_ds.paths), "val_packs": len(val_ds.paths), "fused_adam": fused,
+             "params": n_params},
+            f, ensure_ascii=False, indent=2,
+        )
+
+    history_metrics = []
+    for epoch in range(start_epoch, args.epochs + 1):
+        train_res = train_one_epoch_v3(
+            model, train_loader, optimizer, scaler, criterion, device, args, epoch, amp_dtype, use_scaler
+        )
+        scheduler.step()
+        val_res = evaluate_validation_v3(
+            model, val_loader, criterion, device, epoch=epoch - 1, total_epochs=args.epochs,
+            amp_dtype=amp_dtype, max_steps=args.max_val_steps or None,
+        )
+        epoch_record = {"epoch": epoch, **train_res, **val_res, "lr": optimizer.param_groups[0]["lr"]}
+        history_metrics.append(epoch_record)
+        with open(metrics_file, "w", encoding="utf-8") as f:
+            json.dump(history_metrics, f, ensure_ascii=False, indent=2)
+        log_msg = (
+            f"Epoch {epoch:02d}/{args.epochs} ({train_res['epoch_sec']:.1f}s, {train_res['steps']} steps) | "
+            f"Train Loss: {train_res['train_loss']:.4f}, minADE6: {train_res['train_minade6']:.3f}m, "
+            f"minADE1: {train_res['train_minade1']:.3f}m | "
+            f"Val Loss: {val_res['val_loss']:.4f}, val_minADE6: {val_res['val_minade6']:.4f}m, "
+            f"val_minADE1: {val_res['val_minade1']:.4f}m, val_minFDE6: {val_res['val_minfde6']:.4f}m, "
+            f"Error Score: {val_res['val_error_score']:.4f}"
+        )
+        print(log_msg, flush=True)
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(log_msg + "\n")
+        torch.save(
+            {"epoch": epoch, "model_state": model.state_dict(), "metrics": epoch_record},
+            os.path.join(args.out_dir, "last.pth"),
+        )
+        if val_res["val_error_score"] < best_error_score:
+            best_error_score = val_res["val_error_score"]
+            torch.save(
+                {"epoch": epoch, "model_state": model.state_dict(), "metrics": epoch_record},
+                os.path.join(args.out_dir, "best_error_score.pth"),
+            )
+            print(f"[NEW BEST Error Score]: {best_error_score:.4f} saved!", flush=True)
+        if val_res["val_minade6"] < best_minade6:
+            best_minade6 = val_res["val_minade6"]
+            torch.save(
+                {"epoch": epoch, "model_state": model.state_dict(), "metrics": epoch_record},
+                os.path.join(args.out_dir, "best_minade6.pth"),
+            )
+            print(f"[NEW BEST minADE6]: {best_minade6:.4f}m saved!", flush=True)
+        if args.max_train_steps:
+            print("-> max-train-steps reached; stopping after this epoch.", flush=True)
+            break
+
+    print(
+        f"\nV6 Training Completed! Best Error Score: {best_error_score:.4f}, "
+        f"Best minADE6: {best_minade6:.4f}m",
+        flush=True,
+    )
+
+
+if __name__ == "__main__":
+    main()

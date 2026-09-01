@@ -1,0 +1,1 @@
+Epoch 01/30 (807.0s, 7177 steps) | Train Loss: 10.1836, minADE6: 1.049m, minADE1: 2.471m | Val Loss: 10.2869, val_minADE6: 1.0286m, val_minADE1: 2.4134m, Error Score: 1.7210

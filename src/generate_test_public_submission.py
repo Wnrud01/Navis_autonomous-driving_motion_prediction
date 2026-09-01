@@ -16,7 +16,15 @@ from typing import Any
 import numpy as np
 import torch
 
-from train_motion_prediction_v1 import MotionPredictor, local_vec, local_xy
+from train_motion_prediction_v1 import (
+    MotionPredictor,
+    local_vec,
+    local_xy,
+    pack_neighbor_features,
+    select_neighbor_indices,
+    expand_neighbor_encoder_state,
+    NEIGHBOR_FEAT_DIM,
+)
 
 CURRENT_STEP = 10
 HISTORICAL_STEPS = 11
@@ -90,21 +98,16 @@ def build_features(scene: dict[str, Any], target_ids: list[int]) -> tuple[dict[s
         current_vel_local = local_vec(velocity[:, CURRENT_STEP], yaw)
         candidates = valid[:, CURRENT_STEP].clone()
         candidates[target_id] = False
-        distance = torch.linalg.vector_norm(current_local, dim=-1)
-        distance[~candidates] = float("inf")
-        neighbor_count = min(NEIGHBOR_K, max(num_agents - 1, 0))
-        if neighbor_count:
-            neighbor_ids = torch.topk(distance, k=neighbor_count, largest=False).indices
-            neighbors = torch.cat([
-                current_local[neighbor_ids],
-                current_vel_local[neighbor_ids],
-                shape[neighbor_ids],
-                training_type_feature[neighbor_ids, None],
-            ], dim=-1)
+        if num_agents <= 1:
+            neighbors = torch.zeros((NEIGHBOR_K, NEIGHBOR_FEAT_DIM), dtype=torch.float32)
         else:
-            neighbors = torch.zeros((0, 8), dtype=torch.float32)
-        if neighbors.shape[0] < NEIGHBOR_K:
-            neighbors = torch.cat([neighbors, torch.zeros((NEIGHBOR_K - neighbors.shape[0], 8), dtype=torch.float32)], dim=0)
+            nidx, is_lane, is_dir, valid_pick = select_neighbor_indices(
+                current_local, heading[:, CURRENT_STEP], yaw, candidates, neighbor_k=NEIGHBOR_K,
+            )
+            neighbors = pack_neighbor_features(
+                current_local, current_vel_local, shape, training_type_feature,
+                nidx, is_lane, is_dir, valid_pick, NEIGHBOR_K,
+            )
 
         # V1 was designed to tolerate missing signal data. The public PKL schema has
         # map point light metadata but no pre-built signal-track tensor used in training,
@@ -232,7 +235,7 @@ def main() -> None:
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     hidden = int(checkpoint.get("args", {}).get("hidden", 256))
     model = MotionPredictor(hidden=hidden, modes=K_MODES).to(device)
-    model.load_state_dict(checkpoint["model_state"])
+    model.load_state_dict(expand_neighbor_encoder_state(checkpoint["model_state"]), strict=False)
     model.eval()
     torch.set_float32_matmul_precision("high")
 

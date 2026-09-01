@@ -17,7 +17,10 @@ from matplotlib.collections import LineCollection
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from train_motion_prediction_v1 import MotionPredictor, TYPE_TO_INDEX, local_xy, local_vec
+from src.train_motion_prediction_v1 import (
+    MotionPredictor, TYPE_TO_INDEX, local_xy, local_vec,
+    select_neighbor_indices, pack_neighbor_features, expand_neighbor_encoder_state,
+)
 
 # Roadgraph type -> (color, linewidth, alpha, zorder, linestyle)
 RG_STYLE = {
@@ -102,7 +105,7 @@ def render_all_targets_hdmap_scene(ckpt_path: str, data_root: str, out_png: str,
     checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
     
     model = MotionPredictor(hidden=256, modes=6).to(device)
-    model.load_state_dict(checkpoint['model_state'])
+    model.load_state_dict(expand_neighbor_encoder_state(checkpoint['model_state']), strict=False)
     model.eval()
 
     val_files = sorted(glob.glob(os.path.join(data_root, 'val', '*.pt')))
@@ -175,13 +178,12 @@ def render_all_targets_hdmap_scene(ckpt_path: str, data_root: str, out_png: str,
         cur_vel = local_vec(hist[:, -1, 3:5], yaw)
         candidate = valid[:, -1].clone()
         candidate[row] = False
-        dist = torch.linalg.vector_norm(cur_local, dim=-1)
-        dist[~candidate] = float('inf')
-        
-        nidx = torch.topk(dist, k=min(neighbor_k, hist.shape[0]-1), largest=False).indices
-        nfeat = torch.cat([cur_local[nidx], cur_vel[nidx], sizes[nidx], types[nidx, None].float()], dim=-1)
-        if nfeat.shape[0] < neighbor_k:
-            nfeat = torch.cat([nfeat, torch.zeros(neighbor_k-nfeat.shape[0], nfeat.shape[1])], dim=0)
+        nidx, is_lane, is_dir, valid_pick = select_neighbor_indices(
+            cur_local, hist[:, -1, 2], yaw, candidate, neighbor_k=neighbor_k,
+        )
+        nfeat = pack_neighbor_features(
+            cur_local, cur_vel, sizes, types, nidx, is_lane, is_dir, valid_pick, neighbor_k,
+        )
 
         if sig.shape[0]:
             sig_local = local_xy(sig[:, -1, :2], origin, yaw)

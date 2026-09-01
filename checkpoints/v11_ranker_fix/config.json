@@ -1,0 +1,17 @@
+{
+  "arch": "v11",
+  "ckpt": "E:\\motion_prediction\\checkpoints\\v11_ade6\\best_minade6.pth",
+  "data_root": "E:\\motion_prediction\\data\\processed\\prediction_pt_85k_v2",
+  "cache_root": "E:\\motion_prediction\\data\\processed\\prediction_pt_85k_v2_cache",
+  "out_dir": "E:\\motion_prediction\\checkpoints\\v11_ranker_fix",
+  "epochs": 8,
+  "batch_scenes": 32,
+  "lr": 0.001,
+  "workers": 8,
+  "prefetch": 4,
+  "max_targets": 24,
+  "max_packs": 0,
+  "max_train_steps": 0,
+  "max_val_steps": 0,
+  "amp": "bf16"
+}

@@ -1,0 +1,9 @@
+Ranker 00/pre-train (residual=0, expect ADE1_rank≈ADE1_base≈1.25) | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2511 acc 0.417 Error 0.9385
+Ranker 01/8 (111.8s) | pick_acc 0.419 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2593 acc 0.416 Error 0.9425
+Ranker 02/8 (95.9s) | pick_acc 0.425 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2566 acc 0.427 Error 0.9412
+Ranker 03/8 (96.0s) | pick_acc 0.430 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2602 acc 0.428 Error 0.9430
+Ranker 04/8 (96.4s) | pick_acc 0.431 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2644 acc 0.428 Error 0.9451
+Ranker 05/8 (97.0s) | pick_acc 0.432 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2612 acc 0.428 Error 0.9435
+Ranker 06/8 (97.5s) | pick_acc 0.432 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2616 acc 0.430 Error 0.9437
+Ranker 07/8 (96.5s) | pick_acc 0.433 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2599 acc 0.430 Error 0.9429
+Ranker 08/8 (96.9s) | pick_acc 0.433 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.2625 acc 0.430 Error 0.9442

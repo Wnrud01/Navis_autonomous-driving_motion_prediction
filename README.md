@@ -9,6 +9,17 @@
 > **2026년 자율주행 AI 챌린지 [과제 2. 자율차 주변 미래궤적 예측 (Motion Prediction)]** 전용 딥러닝 솔루션 저장소입니다.  
 > 과거 1.0초간($10$ timesteps)의 거동 이력과 고정밀 HD Map 차선 정보를 바탕으로, 자차(SDC) 반경 50m 이내의 모든 동적 객체(차량, 보행자, 자전거)에 대해 **향후 8.0초간($80$ timesteps)의 다중 모드($K=6$) 미래 주행 궤적을 실시간으로 동시 예측**합니다.
 
+### 2026-08-31 진행 (V11 / V12 / ranker)
+
+| | val minADE6 | val minADE1 | Error |
+|---|---|---|---|
+| **V11 decoder** | **0.6264** | 1.2515 | 0.9389 |
+| **V12 decoder** | **0.6239** | 1.2391 | 0.9315 |
+| Residual ranker (V11 logits prior) | 0.6258 | 1.257 | 0.941 |
+
+Decoder ADE6 바닥은 ~0.62. Ranker는 평가 버그(세 지표를 한 텐서에 누적)를 고친 뒤에도 ADE-winner를 못 고른다 (pick_acc ~0.43).  
+정리: [STATUS.md](STATUS.md) · [RANKER_PROGRESS.md](RANKER_PROGRESS.md)
+
 ---
 
 ## 🎬 1. 실제 예측 시각화 (Real Prediction Visualizations)

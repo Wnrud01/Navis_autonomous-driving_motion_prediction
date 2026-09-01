@@ -1,0 +1,9 @@
+Ranker 00/pre-train (untrained head) | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 5.0227 acc 0.252 Error 2.8243
+Ranker 01/8 (128.0s) | pick_acc 0.415 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.4693 acc 0.419 Error 1.0475
+Ranker 02/8 (112.2s) | pick_acc 0.424 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.4292 acc 0.423 Error 1.0275
+Ranker 03/8 (108.9s) | pick_acc 0.427 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.4306 acc 0.426 Error 1.0282
+Ranker 04/8 (113.5s) | pick_acc 0.429 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.3932 acc 0.428 Error 1.0095
+Ranker 05/8 (115.2s) | pick_acc 0.431 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.3839 acc 0.430 Error 1.0049
+Ranker 06/8 (109.9s) | pick_acc 0.433 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.3601 acc 0.432 Error 0.9930
+Ranker 07/8 (113.9s) | pick_acc 0.434 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.4001 acc 0.431 Error 1.0130
+Ranker 08/8 (109.9s) | pick_acc 0.435 | Val ADE6 0.6258 ADE1_base 1.2511 ADE1_rank 1.4004 acc 0.431 Error 1.0131

@@ -25,7 +25,7 @@ import torch
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from train_motion_prediction_v1 import MotionPredictor, SceneWindowDataset, window_to_samples
+from src.train_motion_prediction_v1 import MotionPredictor, SceneWindowDataset, window_to_samples, expand_neighbor_encoder_state
 
 def evaluate_official_prediction(
     checkpoint_path: str,
@@ -50,7 +50,7 @@ def evaluate_official_prediction(
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     hidden_dim = checkpoint.get('args', {}).get('hidden', 256)
     model = MotionPredictor(hidden=hidden_dim, modes=6).to(device)
-    model.load_state_dict(checkpoint['model_state'])
+    model.load_state_dict(expand_neighbor_encoder_state(checkpoint['model_state']), strict=False)
     model.eval()
 
     total_params = sum(p.numel() for p in model.parameters())
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))
     default_ckpt = os.path.join(current_dir, "checkpoints", "best_minade6.pth")
     if not os.path.exists(default_ckpt):
-        default_ckpt = r"C:\Users\andy0\Downloads\motion prediction\checkpoints\best_minade6.pth"
+        default_ckpt = r"E:\motion_prediction\checkpoints\best_minade6.pth"
     default_data = r"C:\Users\andy0\Downloads\behavior_stack_planner\data\processed\prediction_pt"
 
     parser = argparse.ArgumentParser()
